@@ -1,0 +1,145 @@
+{
+  "version": "0.1",
+  "scope_statement": "Visible sanitation-risk pre-screening for licensed inspectors. Never assesses water safety, potability, or regulatory compliance. Every flag ends in human action or lab-test recommendation.",
+  "categories": [
+    {
+      "id": "water_point",
+      "label": "Water point (tap/borehole/well)",
+      "checkable_states": {
+        "present": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "structural_condition": {
+          "options": [
+            "intact",
+            "damaged",
+            "unclear"
+          ],
+          "examples": "cracked apron, broken casing, leaking fittings are 'damaged'"
+        },
+        "drainage_present": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ],
+          "examples": "soakaway/apron channel that carries spillage away"
+        }
+      }
+    },
+    {
+      "id": "handwashing",
+      "label": "Handwashing station",
+      "checkable_states": {
+        "present": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "water_available_visible": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ],
+          "examples": "reservoir/jerrycan plumbed or filled - visible supply only"
+        },
+        "soap_visible": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ],
+          "examples": "soap bar/dispenser in frame"
+        }
+      }
+    },
+    {
+      "id": "excreta",
+      "label": "Toilet / latrine",
+      "checkable_states": {
+        "present": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "slab_condition": {
+          "options": [
+            "intact",
+            "damaged",
+            "unclear"
+          ]
+        },
+        "privacy_enclosure": {
+          "options": [
+            "intact",
+            "damaged",
+            "absent",
+            "unclear"
+          ]
+        }
+      }
+    },
+    {
+      "id": "waste",
+      "label": "Solid waste handling",
+      "checkable_states": {
+        "bin_present": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "overflow_visible": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "open_dumping_within_view": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        }
+      }
+    },
+    {
+      "id": "drainage",
+      "label": "Drainage / standing water",
+      "checkable_states": {
+        "standing_water_within_view": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        },
+        "channel_blocked_visible": {
+          "options": [
+            "yes",
+            "no",
+            "unclear"
+          ]
+        }
+      }
+    }
+  ],
+  "hard_exclusions": [
+    "Never asserts water safety, potability, or contamination",
+    "Never certifies regulatory compliance (EHORECON/WHO standards are the inspector's to apply)",
+    "Never scores 'cleanliness' - only presence/condition of visible infrastructure",
+    "Every report ends in: inspector review and/or lab-test recommendation"
+  ]
+}

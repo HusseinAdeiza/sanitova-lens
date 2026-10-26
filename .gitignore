@@ -1,0 +1,24 @@
+# .gitignore — Sanitova Lens
+
+# credentials — never commit
+.env
+*.env
+!.env.example
+
+# labeled data (privacy: facility photos + inspector rulings are NOT public)
+lens_events.jsonl
+data/
+labeled*.jsonl
+*.jsonl
+!schema/*.json
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# demo scratch
+demo_images/
+*.jpg.tmp

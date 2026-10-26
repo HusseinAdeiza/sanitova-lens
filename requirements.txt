@@ -1,0 +1,3 @@
+# HF Space runtime deps — pinned loosely, stdlib core stays install-free
+gradio>=4.0
+pillow>=10.0
