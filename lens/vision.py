@@ -81,7 +81,8 @@ def detect(image_bytes: bytes, source: str | None = None) -> tuple[list[Finding]
     src = source or backend_name()
     if src == "mmda":
         try:
-            det = _detect_mmda(image_bytes)
+            from .mmda import detect_mmda
+            det = detect_mmda(image_bytes)
         except Exception as e:                      # noqa: BLE001
             det = [_unclear("meta api unavailable: " + type(e).__name__)]
             src = "stub-fallback"

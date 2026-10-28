@@ -12,8 +12,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .score import triage
-from .vision import detect
+from .vision import backend_name, detect  # noqa: E402
+from .score import triage  # noqa: E402
 
 
 def inspect_file(path: Path) -> int:

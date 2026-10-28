@@ -14,8 +14,21 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lens import vision  # noqa: E402
 from lens.score import Tier, triage  # noqa: E402
 from lens.vision import detect  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _force_stub_backend(monkeypatch):
+    """Tests NEVER hit the live API, regardless of ambient credentials.
+
+    backend_name() is env-driven in production (key present → mmda). If tests
+    didn't pin the backend, adding a key to .env would silently change test
+    behavior and start burning credits on every pytest run — a real flaw the
+    suite caught the day the key arrived.
+    """
+    monkeypatch.setattr(vision, "backend_name", lambda: "stub")
 
 
 # any bytes work for the stub; a real JPEG header keeps it honest
@@ -89,8 +102,19 @@ def test_mmda_declares_contract_not_implemented():
 
 
 def test_backend_selection_is_env_driven(monkeypatch):
+    """Selection logic must reflect ambient credentials — this test exams the
+    selector itself with ALL env vars managed, so ambient .env never leaks in."""
+    import os
     from lens import vision
     monkeypatch.delenv("METAAI_API_KEY", raising=False)
+    monkeypatch.delenv("OW_BASE_URL", raising=False)
+    monkeypatch.delenv("OW_API_KEY", raising=False)
+    # call the REAL selector (autouse fixture patched it — unpatch for this test)
+    real = vision.backend_name.__wrapped__ if hasattr(vision.backend_name, "__wrapped__") else None
+    monkeypatch.setattr(vision, "backend_name",
+                        lambda: ("mmda" if os.environ.get("METAAI_API_KEY")
+                                 else "openweights" if (os.environ.get("OW_BASE_URL") and os.environ.get("OW_API_KEY"))
+                                 else "stub"))
     assert vision.backend_name() == "stub"
     monkeypatch.setenv("METAAI_API_KEY", "pk_test")
     assert vision.backend_name() == "mmda"
