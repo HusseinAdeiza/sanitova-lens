@@ -157,16 +157,22 @@ def test_judge_prompt_carries_the_scope_forbiddance(fake_client):
 
 # ------------------------------------------------------- detect (full flow) --
 
-def test_detect_full_flow_missing_target_becomes_present_no(fake_client):
-    """SAM finds nothing → present=no is recorded honestly (a REAL finding)."""
+def test_detect_full_flow_missing_target_becomes_unclear(fake_client):
+    """SAM finds nothing → the category's judgment comes from Muse with the
+    NULL-transport semantics (miss ≠ absence): unjudged states 'unclear'
+    rather than a fabricated 'no'. (Rewritten 2026-10-30: the old assertion
+    'present=no' encoded the false-absence bug the Muse-first fix removed.)"""
     fake_client.responses = FakeResponses("")   # SAM: nothing anywhere
-    fake_client.chat = FakeCompletions({})      # Muse should NOT be called
+    fake_client.chat = FakeCompletions({})      # Muse: no usable JSON
     det = mmda.detect_mmda(URL)
-    present = [d for d in det if d.state == "present"]
-    assert len(present) == len(mmda.SAM_TARGETS)
-    assert all(d.value == "no" for d in present)
-    named = fake_client.chat                    # never invoked
-    assert named is not None
+    # Muse-first: every schema state for every category gets a finding (14 here)
+    n_states = sum(len(mmda.schema_states_for(cat)) for cat in mmda.SAM_TARGETS)
+    assert len(det) == n_states
+    # a miss must NOT be recorded as a confident absence
+    nos = [d for d in det if d.value == "no"]
+    assert nos == [], f"false absences recorded: {[(d.category, d.state) for d in nos]}"
+    unclear = [d for d in det if d.value == "unclear"]
+    assert unclear, "expected unclear (honest 'can't judge') somewhere"
 
 
 def test_detect_full_flow_judges_states_within_schema(fake_client):

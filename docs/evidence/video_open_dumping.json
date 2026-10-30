@@ -1,0 +1,11 @@
+{
+  "captured": "2026-10-30T20:14:29Z",
+  "source": "capture_video.mp4 (37.4s, two scenes: bridge dump + railway corridor)",
+  "keyframes_judged": 4,
+  "aggregated_states": {
+    "bin_present": "no",
+    "overflow_visible": "no",
+    "open_dumping_within_view": "yes"
+  },
+  "per_keyframe": "unanimous open_dumping_within_view=yes across 4 frames"
+}
