@@ -67,7 +67,16 @@ class Detection:
 
 
 def backend_name() -> str:
-    """Which backend will detect() use? (env-driven, decided in one place)"""
+    """Which backend will detect() use? (env-driven, decided in one place)
+
+    LENS_FORCE_BACKEND (set by the review UI's spend guard) overrides the
+    ambient-credential default: after the daily live cap the UI pins 'stub'
+    so a public demo degrades to an honestly-labeled heuristic instead of
+    burning credits; a live run pins 'mmda' so an env set later never
+    silently changes an already-started session's behavior."""
+    forced = os.environ.get("LENS_FORCE_BACKEND")
+    if forced in ("mmda", "openweights", "stub"):
+        return forced
     if os.environ.get("METAAI_API_KEY"):
         return "mmda"
     if os.environ.get("OW_BASE_URL") and os.environ.get("OW_API_KEY"):
@@ -82,7 +91,15 @@ def detect(image_bytes: bytes, source: str | None = None) -> tuple[list[Finding]
     if src == "mmda":
         try:
             from .mmda import detect_mmda
-            det = detect_mmda(image_bytes)
+            # detect_mmda takes a FETCHABLE URL (Meta's media fetcher refuses
+            # data: URIs — verified 2026-10-27). Bytes from an upload must ride
+            # through the photo host; the published-example path already bikes
+            # a public raw-githubusercontent URL, and yes: that asymmetry cost
+            # us one silent stub-fallback before this comment existed.
+            if isinstance(image_bytes, (bytes, bytearray)):
+                det = detect_mmda(_host_bytes(bytes(image_bytes)))
+            else:
+                det = detect_mmda(image_bytes)
         except Exception as e:                      # noqa: BLE001
             det = [_unclear("meta api unavailable: " + type(e).__name__)]
             src = "stub-fallback"
@@ -149,6 +166,26 @@ def _detect_stub(img: bytes) -> list[Detection]:
 
 
 # ------------------------------------------------------------------ mmda ----
+
+def _host_bytes(img: bytes) -> str:
+    """bytes -> a publicly-fetchable URL via the local photo host (serve.py).
+
+    detect_mmda() needs a URL Meta's fetcher can reach. Uploads (UI, CLI, API)
+    arrive as bytes, so they POST to the photo host and return its URL. The
+    host binds 0.0.0.0:8765 when the review app launches (serve.py is started
+    alongside the UI; see lens/app.py __main__)."""
+    import urllib.request, json as _json
+    host = os.environ.get("LENS_PHOTO_HOST", "http://127.0.0.1:8765")
+    req = urllib.request.Request(host + "/upload", data=img, method="POST")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        name = r.headers.get("X-Filename")
+    if not name:
+        raise RuntimeError("photo host returned no filename")
+    # from the server's own perspective 127.0.0.1 works; Meta's fetcher needs
+    # the public address, so swap in the configured public origin.
+    public = os.environ.get("LENS_PUBLIC_ORIGIN", "http://75.119.152.168:8765")
+    return f"{public}/{name}"
+
 
 def _detect_mmda(img: bytes) -> list[Detection]:
     """SAM 3.1 segmentation + Muse judgment via Meta Model API.

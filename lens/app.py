@@ -26,6 +26,43 @@ from .vision import backend_name, detect
 _STORE_PATH = Path(os.environ.get("LENS_STORE", "./lens_events.jsonl"))
 _store = Store(_STORE_PATH)
 
+# Spend guard: every live vision run draws against the project's Meta credits.
+# A public URL invites curiosity (and bots); without a cap, one enthusiastic
+# judge costs nothing measurable but a scraper at 3am costs real money.
+# After the daily cap the app falls back to the demo-grade stub and SAYS SO —
+# an honest degradation, never a fake pass. The cap resets at midnight UTC.
+_LIVE_RUNS_PER_DAY = int(os.environ.get("LENS_LIVE_RUNS_PER_DAY", "40"))
+EXAMPLE_URL = "https://raw.githubusercontent.com/HusseinAdeiza/lens-media/master/open_dump_real.jpg"
+
+
+class _DailyCap:
+    """Counts live runs per UTC day; tiny, in-memory, honest."""
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        self.day = None
+        self.n = 0
+
+    def try_spend(self) -> bool:
+        import datetime
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        if today != self.day:
+            self.day, self.n = today, 0
+        if self.n >= self.limit:
+            return False
+        self.n += 1
+        return True
+
+    def left(self) -> int:
+        import datetime
+        today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        if today != self.day:
+            return self.limit
+        return max(0, self.limit - self.n)
+
+
+_cap = _DailyCap(_LIVE_RUNS_PER_DAY)
+
 _SCOPE_BANNER = (
     "VISIBLE CONDITIONS ONLY - pre-screen triage for licensed inspectors. "
     "This tool never asserts water safety or quality; water quality requires "
@@ -43,6 +80,17 @@ def inspect(image, facility_name: str):
         return "No image supplied.", gr.update()
     img_bytes = Path(image).read_bytes() if isinstance(image, (str, Path)) else image
     sha = _sha(img_bytes)
+
+    # Spend guard FIRST: decide which backend this run may use.
+    if os.environ.get("METAAI_API_KEY") and _cap.try_spend():
+        os.environ["LENS_FORCE_BACKEND"] = "mmda"
+        note = (f"live run — {_cap.left()} live runs left today (resets 00:00 UTC)")
+    else:
+        os.environ["LENS_FORCE_BACKEND"] = "stub"
+        note = ("DEMO-GRADE fallback — daily live-run cap reached (or no API key "
+                "configured). The heuristic below is NOT a vision model; come "
+                "back after 00:00 UTC for live inference.")
+
     findings, backend = detect(img_bytes)
     report = triage(findings, facility=facility_name or "unnamed facility")
 
@@ -60,6 +108,7 @@ def inspect(image, facility_name: str):
     md += f"\n  detected by : {backend}"
     if backend == "stub":
         md += "  ( DEMO-GRADE heuristic - not a vision model )"
+    md += f"\n  {note}"
     md += f"\n  event ids   : {', '.join(ids)}"
     md += f"\n\n_{_SCOPE_BANNER}_"
     return md, (sha, ids)
@@ -107,11 +156,25 @@ def build_ui():
                                sources=["upload", "webcam"])
                 fac = gr.Textbox(label="Facility name / ID", placeholder="e.g. BH-014")
                 btn = gr.Button("Run pre-screen", variant="primary")
+                ex = gr.Button("Try the published example (real photo, live models)",
+                               variant="secondary")
             with gr.Column():
                 out_md = gr.Markdown("Report appears here.")
         state = gr.State()
 
+        def run_example():
+            """Fetch the committed public example into a temp file and inspect it.
+            Download (not URL passthrough) so the run exercises the same path a
+            judge's own upload would — one honest code path for everyone."""
+            import tempfile, urllib.request
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+                with urllib.request.urlopen(EXAMPLE_URL, timeout=30) as r:
+                    tf.write(r.read())
+                path = tf.name
+            return inspect(path, "published example — roadside open dump")
+
         btn.click(inspect, inputs=[img, fac], outputs=[out_md, state])
+        ex.click(run_example, inputs=None, outputs=[out_md, state])
 
         gr.Markdown("---\n### Inspector ruling (authoritative)")
         with gr.Row():
@@ -138,5 +201,12 @@ def build_ui():
 
 
 if __name__ == "__main__":
+    import threading, subprocess, sys
+    # the photo host must be up before the UI accepts traffic: detect(mmda)
+    # round-trips uploads through it (see vision._host_bytes).
+    threading.Thread(
+        target=lambda: subprocess.run([sys.executable, "-m", "lens.serve", "8765"]),
+        daemon=True).start()
+    import time; time.sleep(1.5)
     build_ui().launch(server_name=os.environ.get("LENS_HOST", "127.0.0.1"),
                        server_port=int(os.environ.get("LENS_PORT", "7860")))
